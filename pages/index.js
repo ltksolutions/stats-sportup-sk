@@ -21,7 +21,7 @@ function useChart(canvasRef, buildFn, deps) {
 }
 
 export default function Home() {
-  const [year, setYear] = useState('2024')
+  const [year, setYear] = useState('2026')
   const [scaleType, setScaleType] = useState('logarithmic')
   const [chartType, setChartType] = useState('line')
   const [hidden, setHidden] = useState(new Set())
