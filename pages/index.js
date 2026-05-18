@@ -2,6 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 
+const OG_TITLE       = 'Štatistiky slovenského športu – IS Športu'
+const OG_DESCRIPTION = 'Interaktívny dashboard dát z Informačného systému športu Slovenska. Vekové profily, zväzy, amatéri vs. profesionáli a vývoj 2021–2026.'
+const OG_URL         = 'https://stats.sportup.sk'
+const OG_IMAGE       = 'https://stats.sportup.sk/og-image.png'
+
 const Logo = () => (
   <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
     <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -72,7 +77,6 @@ export default function Home() {
   const rokyExpertRef = useRef(null)
   const compareRef = useRef(null)
 
-  // Fetch main year data
   useEffect(() => {
     setLoading(true)
     Promise.all([
@@ -81,114 +85,76 @@ export default function Home() {
       fetch(`/api/amater-profi?year=${year}`).then(r => r.json()),
       fetch(`/api/odbornici?year=${year}`).then(r => r.json()),
     ]).then(([vek, zvaz, am, odbor]) => {
-      setVekData(vek)
-      setZvazData(zvaz)
-      setAmProfiData(am)
-      setOdborData(odbor)
-      setHidden(new Set())
-      setLoading(false)
+      setVekData(vek); setZvazData(zvaz); setAmProfiData(am); setOdborData(odbor)
+      setHidden(new Set()); setLoading(false)
     })
   }, [year])
 
-  // Fetch roky data once
   useEffect(() => {
     setRokyLoading(true)
-    fetch('/api/roky-sport').then(r => r.json()).then(d => {
-      setRokyData(d)
-      setRokyLoading(false)
-    })
+    fetch('/api/roky-sport').then(r => r.json()).then(d => { setRokyData(d); setRokyLoading(false) })
   }, [])
 
-  // Fetch comparison data when year or activity changes
   useEffect(() => {
-    setCompareLoading(true)
-    setCompareSports(new Set())
+    setCompareLoading(true); setCompareSports(new Set())
     fetch(`/api/vek-porovnanie?year=${year}&activity=${compareActivity}`)
-      .then(r => r.json())
-      .then(d => {
+      .then(r => r.json()).then(d => {
         setCompareData(d)
-        // Auto-select top 5 sports
-        const top5 = (d.sports || []).slice(0, 5)
-        setCompareSports(new Set(top5))
+        setCompareSports(new Set((d.sports || []).slice(0, 5)))
         setCompareLoading(false)
       })
   }, [year, compareActivity])
 
-  const toggleAge = (age) => {
-    setSelectedAges(prev => {
-      const next = new Set(prev)
-      if (next.has(age)) { if (next.size > 1) next.delete(age) }
-      else next.add(age)
-      return next
-    })
-  }
+  const toggleAge = (age) => setSelectedAges(prev => {
+    const next = new Set(prev)
+    if (next.has(age)) { if (next.size > 1) next.delete(age) } else next.add(age)
+    return next
+  })
   const selectAllAges = () => setSelectedAges(new Set(AGE_ORDER))
   const clearAges = (group) => {
-    if (group === 'youth') setSelectedAges(new Set(['do 5','6-10','11-14','15-18']))
-    if (group === 'adult') setSelectedAges(new Set(['19-23','24-30','31-40']))
+    if (group === 'youth')  setSelectedAges(new Set(['do 5','6-10','11-14','15-18']))
+    if (group === 'adult')  setSelectedAges(new Set(['19-23','24-30','31-40']))
     if (group === 'senior') setSelectedAges(new Set(['41-50','51-60','61+']))
   }
-
-  const toggleCompareSport = (sport) => {
-    setCompareSports(prev => {
-      const next = new Set(prev)
-      if (next.has(sport)) {
-        if (next.size > 1) next.delete(sport)
-      } else {
-        if (next.size < 10) next.add(sport)
-      }
-      return next
-    })
-  }
-
-  const toggleCompareAge = (age) => {
-    setCompareSelectedAges(prev => {
-      const next = new Set(prev)
-      if (next.has(age)) { if (next.size > 1) next.delete(age) }
-      else next.add(age)
-      return next
-    })
-  }
+  const toggleCompareSport = (sport) => setCompareSports(prev => {
+    const next = new Set(prev)
+    if (next.has(sport)) { if (next.size > 1) next.delete(sport) }
+    else { if (next.size < 10) next.add(sport) }
+    return next
+  })
+  const toggleCompareAge = (age) => setCompareSelectedAges(prev => {
+    const next = new Set(prev)
+    if (next.has(age)) { if (next.size > 1) next.delete(age) } else next.add(age)
+    return next
+  })
+  const toggleSport = (sport) => setHidden(prev => {
+    const next = new Set(prev); if (next.has(sport)) next.delete(sport); else next.add(sport); return next
+  })
 
   // Chart 1: Vek × Šport
   useEffect(() => {
     if (!vekData || !window.Chart || !vekRef.current) return
-    const existing = window.Chart.getChart(vekRef.current)
-    if (existing) existing.destroy()
-
+    const existing = window.Chart.getChart(vekRef.current); if (existing) existing.destroy()
     const activeAges = AGE_ORDER.filter(a => selectedAges.has(a))
     const { top20, data } = vekData
-    const datasets = top20.map((sport, i) => {
-      const pts = activeAges.map(age => {
-        const row = data.find(d => d._id.sport === sport && d._id.vek === age)
-        return row ? row.count : 0
-      })
-      return {
-        label: sport, data: pts,
-        borderColor: COLORS[i], backgroundColor: COLORS[i] + '33',
-        borderWidth: 2, pointRadius: chartType === 'line' ? 3 : 0,
-        tension: 0.35, fill: false, hidden: hidden.has(sport),
-        type: chartType === 'bar' ? 'bar' : 'line',
-        stack: chartType === 'bar' ? 'stack' : undefined,
-      }
-    })
-
-    new window.Chart(vekRef.current, {
+    const datasets = top20.map((sport, i) => ({
+      label: sport,
+      data: activeAges.map(age => { const r = data.find(d => d._id.sport === sport && d._id.vek === age); return r ? r.count : 0 }),
+      borderColor: COLORS[i], backgroundColor: COLORS[i] + '33',
+      borderWidth: 2, pointRadius: chartType === 'line' ? 3 : 0,
+      tension: 0.35, fill: false, hidden: hidden.has(sport),
       type: chartType === 'bar' ? 'bar' : 'line',
-      data: { labels: activeAges, datasets },
+      stack: chartType === 'bar' ? 'stack' : undefined,
+    }))
+    new window.Chart(vekRef.current, {
+      type: chartType === 'bar' ? 'bar' : 'line', data: { labels: activeAges, datasets },
       options: {
         responsive: true, maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
-        plugins: { legend: { display: false }, tooltip: {
-          itemSort: (a,b) => b.raw - a.raw,
-          callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y.toLocaleString('sk-SK')}` }
-        }},
+        plugins: { legend: { display: false }, tooltip: { itemSort: (a,b) => b.raw - a.raw, callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y.toLocaleString('sk-SK')}` } } },
         scales: {
           x: { stacked: chartType === 'bar', ticks: { color: '#888' }, grid: { color: 'rgba(128,128,128,0.1)' } },
-          y: { stacked: chartType === 'bar', type: scaleType, min: scaleType === 'logarithmic' ? 1 : 0,
-            ticks: { color: '#888', callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v },
-            grid: { color: 'rgba(128,128,128,0.1)' }
-          }
+          y: { stacked: chartType === 'bar', type: scaleType, min: scaleType === 'logarithmic' ? 1 : 0, ticks: { color: '#888', callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v }, grid: { color: 'rgba(128,128,128,0.1)' } }
         }
       }
     })
@@ -197,183 +163,90 @@ export default function Home() {
   // Chart 2: Zväzy
   useEffect(() => {
     if (!zvazData || !window.Chart || !zvazRef.current) return
-    const existing = window.Chart.getChart(zvazRef.current)
-    if (existing) existing.destroy()
-    const labels = zvazData.data.map(d => d._id)
-    const values = zvazData.data.map(d => d.athletes)
+    const existing = window.Chart.getChart(zvazRef.current); if (existing) existing.destroy()
+    const labels = zvazData.data.map(d => d._id), values = zvazData.data.map(d => d.athletes)
     new window.Chart(zvazRef.current, {
-      type: 'bar',
-      data: { labels, datasets: [{ label: 'Športovci', data: values,
-        backgroundColor: labels.map((_, i) => COLORS[i % COLORS.length] + 'CC'),
-        borderColor: labels.map((_, i) => COLORS[i % COLORS.length]),
-        borderWidth: 1 }] },
-      options: {
-        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: {
-          callbacks: { label: c => ` ${c.parsed.x.toLocaleString('sk-SK')} športovcov` }
-        }},
-        scales: {
-          x: { ticks: { color: '#888', callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v }, grid: { color: 'rgba(128,128,128,0.1)' } },
-          y: { ticks: { color: '#555', font: { size: 11 } }, grid: { display: false } }
-        }
-      }
+      type: 'bar', data: { labels, datasets: [{ label: 'Športovci', data: values, backgroundColor: labels.map((_, i) => COLORS[i % COLORS.length] + 'CC'), borderColor: labels.map((_, i) => COLORS[i % COLORS.length]), borderWidth: 1 }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.parsed.x.toLocaleString('sk-SK')} športovcov` } } }, scales: { x: { ticks: { color: '#888', callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v }, grid: { color: 'rgba(128,128,128,0.1)' } }, y: { ticks: { color: '#555', font: { size: 11 } }, grid: { display: false } } } }
     })
   }, [zvazData])
 
   // Chart 3: Amatér vs Profi
   useEffect(() => {
     if (!amProfiData || !window.Chart || !amRef.current) return
-    const existing = window.Chart.getChart(amRef.current)
-    if (existing) existing.destroy()
+    const existing = window.Chart.getChart(amRef.current); if (existing) existing.destroy()
     const { top20, data } = amProfiData
     const types = [...new Set(data.map(d => d._id.typ))]
     const typeColors = { athlete_amateur: '#378ADD', athlete_professional: '#D85A30' }
-    const datasets = types.map(typ => ({
-      label: typ === 'athlete_amateur' ? 'Amatér' : typ === 'athlete_professional' ? 'Profesionál' : typ,
-      data: top20.map(sport => {
-        const row = data.find(d => d._id.sport === sport && d._id.typ === typ)
-        return row ? row.count : 0
-      }),
-      backgroundColor: (typeColors[typ] || '#888') + 'BB',
-      borderColor: typeColors[typ] || '#888',
-      borderWidth: 1, stack: 'stack'
-    }))
     new window.Chart(amRef.current, {
-      type: 'bar', data: { labels: top20, datasets },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: 'top', labels: { font: { size: 12 }, color: '#555' } }, tooltip: {
-          callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y.toLocaleString('sk-SK')}` }
-        }},
-        scales: {
-          x: { stacked: true, ticks: { color: '#555', font: { size: 11 }, maxRotation: 35 }, grid: { display: false } },
-          y: { stacked: true, ticks: { color: '#888', callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v }, grid: { color: 'rgba(128,128,128,0.1)' } }
-        }
-      }
+      type: 'bar', data: { labels: top20, datasets: types.map(typ => ({ label: typ === 'athlete_amateur' ? 'Amatér' : typ === 'athlete_professional' ? 'Profesionál' : typ, data: top20.map(sport => { const r = data.find(d => d._id.sport === sport && d._id.typ === typ); return r ? r.count : 0 }), backgroundColor: (typeColors[typ] || '#888') + 'BB', borderColor: typeColors[typ] || '#888', borderWidth: 1, stack: 'stack' })) },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { font: { size: 12 }, color: '#555' } }, tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y.toLocaleString('sk-SK')}` } } }, scales: { x: { stacked: true, ticks: { color: '#555', font: { size: 11 }, maxRotation: 35 }, grid: { display: false } }, y: { stacked: true, ticks: { color: '#888', callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v }, grid: { color: 'rgba(128,128,128,0.1)' } } } }
     })
   }, [amProfiData])
 
   // Chart 4: Odborníci
   useEffect(() => {
     if (!odborData || !window.Chart || !odborRef.current) return
-    const existing = window.Chart.getChart(odborRef.current)
-    if (existing) existing.destroy()
+    const existing = window.Chart.getChart(odborRef.current); if (existing) existing.destroy()
     const topOdbor = odborData.data.slice(0, 25)
-    const labels = topOdbor.map(d => `${d._id.kategoria} – ${d._id.sport}`)
-    const values = topOdbor.map(d => d.count)
     new window.Chart(odborRef.current, {
-      type: 'bar',
-      data: { labels, datasets: [{ label: 'Odborníci', data: values,
-        backgroundColor: COLORS.map(c => c + 'BB'), borderColor: COLORS, borderWidth: 1 }] },
-      options: {
-        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: {
-          callbacks: { label: c => ` ${c.parsed.x.toLocaleString('sk-SK')} odborníkov` }
-        }},
-        scales: {
-          x: { ticks: { color: '#888', callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v }, grid: { color: 'rgba(128,128,128,0.1)' } },
-          y: { ticks: { color: '#555', font: { size: 11 } }, grid: { display: false } }
-        }
-      }
+      type: 'bar', data: { labels: topOdbor.map(d => `${d._id.kategoria} – ${d._id.sport}`), datasets: [{ label: 'Odborníci', data: topOdbor.map(d => d.count), backgroundColor: COLORS.map(c => c + 'BB'), borderColor: COLORS, borderWidth: 1 }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.parsed.x.toLocaleString('sk-SK')} odborníkov` } } }, scales: { x: { ticks: { color: '#888', callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v }, grid: { color: 'rgba(128,128,128,0.1)' } }, y: { ticks: { color: '#555', font: { size: 11 } }, grid: { display: false } } } }
     })
   }, [odborData])
 
-  // Chart 5 & 6: Vývoj po rokoch
+  // Charts 5 & 6: Vývoj po rokoch
   const buildRokyChart = (canvasRef, seriesData) => {
     if (!seriesData || !window.Chart || !canvasRef.current) return
-    const existing = window.Chart.getChart(canvasRef.current)
-    if (existing) existing.destroy()
-    const datasets = seriesData.map((s, i) => ({
-      label: s.sport, data: s.values,
-      borderColor: COLORS[i], backgroundColor: COLORS[i] + '22',
-      borderWidth: 2, pointRadius: 4, pointHoverRadius: 6,
-      tension: 0.3, fill: false
-    }))
+    const existing = window.Chart.getChart(canvasRef.current); if (existing) existing.destroy()
     new window.Chart(canvasRef.current, {
-      type: 'line',
-      data: { labels: YEARS, datasets },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { position: 'bottom', labels: { font: { size: 11 }, color: '#555', boxWidth: 12, padding: 10 } },
-          tooltip: {
-            itemSort: (a,b) => b.raw - a.raw,
-            callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y.toLocaleString('sk-SK')}` }
-          }
-        },
-        scales: {
-          x: { ticks: { color: '#888' }, grid: { color: 'rgba(128,128,128,0.1)' } },
-          y: { ticks: { color: '#888', callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v }, grid: { color: 'rgba(128,128,128,0.1)' } }
-        }
-      }
+      type: 'line', data: { labels: YEARS, datasets: seriesData.map((s, i) => ({ label: s.sport, data: s.values, borderColor: COLORS[i], backgroundColor: COLORS[i] + '22', borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, tension: 0.3, fill: false })) },
+      options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, color: '#555', boxWidth: 12, padding: 10 } }, tooltip: { itemSort: (a,b) => b.raw - a.raw, callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y.toLocaleString('sk-SK')}` } } }, scales: { x: { ticks: { color: '#888' }, grid: { color: 'rgba(128,128,128,0.1)' } }, y: { ticks: { color: '#888', callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v }, grid: { color: 'rgba(128,128,128,0.1)' } } } }
     })
   }
-
   useEffect(() => { buildRokyChart(rokyAthleteRef, rokyData?.athleteData) }, [rokyData])
-  useEffect(() => { buildRokyChart(rokyExpertRef, rokyData?.expertData) }, [rokyData])
+  useEffect(() => { buildRokyChart(rokyExpertRef,  rokyData?.expertData)  }, [rokyData])
 
   // Chart 7: Porovnanie športov
   useEffect(() => {
     if (!compareData || !window.Chart || !compareRef.current || compareSports.size === 0) return
-    const existing = window.Chart.getChart(compareRef.current)
-    if (existing) existing.destroy()
-
+    const existing = window.Chart.getChart(compareRef.current); if (existing) existing.destroy()
     const activeAges = AGE_ORDER.filter(a => compareSelectedAges.has(a))
     const selectedList = [...compareSports]
-
-    const datasets = selectedList.map((sport, i) => {
-      const pts = activeAges.map(age => {
-        const row = compareData.data.find(d => d._id.sport === sport && d._id.vek === age)
-        return row ? row.count : 0
-      })
-      return {
-        label: sport, data: pts,
-        borderColor: COLORS[i % COLORS.length],
-        backgroundColor: COLORS[i % COLORS.length] + '22',
-        borderWidth: 2.5, pointRadius: 4, pointHoverRadius: 7,
-        tension: 0.35, fill: false,
-      }
-    })
-
     new window.Chart(compareRef.current, {
       type: 'line',
-      data: { labels: activeAges, datasets },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { position: 'bottom', labels: { font: { size: 12 }, color: '#555', boxWidth: 14, padding: 12 } },
-          tooltip: {
-            itemSort: (a,b) => b.raw - a.raw,
-            callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y.toLocaleString('sk-SK')}` }
-          }
-        },
-        scales: {
-          x: { ticks: { color: '#888' }, grid: { color: 'rgba(128,128,128,0.1)' } },
-          y: {
-            min: 0,
-            ticks: { color: '#888', callback: v => v >= 1000 ? (v/1000).toFixed(1)+'k' : v },
-            grid: { color: 'rgba(128,128,128,0.1)' }
-          }
-        }
-      }
+      data: { labels: activeAges, datasets: selectedList.map((sport, i) => ({ label: sport, data: activeAges.map(age => { const r = compareData.data.find(d => d._id.sport === sport && d._id.vek === age); return r ? r.count : 0 }), borderColor: COLORS[i % COLORS.length], backgroundColor: COLORS[i % COLORS.length] + '22', borderWidth: 2.5, pointRadius: 4, pointHoverRadius: 7, tension: 0.35, fill: false })) },
+      options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, color: '#555', boxWidth: 14, padding: 12 } }, tooltip: { itemSort: (a,b) => b.raw - a.raw, callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y.toLocaleString('sk-SK')}` } } }, scales: { x: { ticks: { color: '#888' }, grid: { color: 'rgba(128,128,128,0.1)' } }, y: { min: 0, ticks: { color: '#888', callback: v => v >= 1000 ? (v/1000).toFixed(1)+'k' : v }, grid: { color: 'rgba(128,128,128,0.1)' } } } }
     })
   }, [compareData, compareSports, compareSelectedAges])
-
-  const toggleSport = (sport) => {
-    setHidden(prev => { const next = new Set(prev); if (next.has(sport)) next.delete(sport); else next.add(sport); return next })
-  }
 
   const totalAthletes = vekData?.data?.reduce((s, d) => s + d.count, 0) || 0
 
   return (
     <>
       <Head>
-        <title>Štatistiky slovenského športu – IS Športu {year}</title>
-        <meta name="description" content="Interaktívne štatistiky z Informačného systému športu Slovenska" />
+        <title>{OG_TITLE}</title>
+        <meta name="description" content={OG_DESCRIPTION} />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
+
+        {/* ── Open Graph (Facebook, LinkedIn, Messenger) ── */}
+        <meta property="og:type"        content="website" />
+        <meta property="og:url"         content={OG_URL} />
+        <meta property="og:title"       content={OG_TITLE} />
+        <meta property="og:description" content={OG_DESCRIPTION} />
+        <meta property="og:image"       content={OG_IMAGE} />
+        <meta property="og:image:width"  content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:locale"      content="sk_SK" />
+        <meta property="og:site_name"   content="stats.sportup.sk" />
+
+        {/* ── Twitter / X ── */}
+        <meta name="twitter:card"        content="summary_large_image" />
+        <meta name="twitter:title"       content={OG_TITLE} />
+        <meta name="twitter:description" content={OG_DESCRIPTION} />
+        <meta name="twitter:image"       content={OG_IMAGE} />
+
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&display=swap" rel="stylesheet" />
@@ -393,8 +266,7 @@ export default function Home() {
                 borderColor: year === y ? '#388FC3' : '#e5e7eb',
                 background: year === y ? '#EBF5FB' : 'white',
                 color: year === y ? '#1A2D47' : '#374151',
-                fontWeight: year === y ? 700 : 400,
-                cursor: 'pointer', fontSize: 13
+                fontWeight: year === y ? 700 : 400, cursor: 'pointer', fontSize: 13
               }}>{y}</button>
             ))}
           </div>
@@ -408,9 +280,9 @@ export default function Home() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: '2.5rem' }}>
               {[
                 { label: 'Športovci spolu', value: totalAthletes.toLocaleString('sk-SK') },
-                { label: 'Sledovaný rok', value: year },
-                { label: 'Top šport', value: vekData.top20?.[0] || '–' },
-                { label: 'Počet zväzov', value: zvazData?.data?.length || '–' },
+                { label: 'Sledovaný rok',   value: year },
+                { label: 'Top šport',       value: vekData.top20?.[0] || '–' },
+                { label: 'Počet zväzov',    value: zvazData?.data?.length || '–' },
               ].map(m => (
                 <div key={m.label} style={{ background: '#f9fafb', borderRadius: 10, padding: '1rem 1.25rem' }}>
                   <p style={{ fontSize: 12, color: '#9ca3af', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{m.label}</p>
@@ -428,51 +300,37 @@ export default function Home() {
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <Btn active={chartType==='line'} onClick={() => setChartType('line')} small>Čiary</Btn>
-                  <Btn active={chartType==='bar'} onClick={() => setChartType('bar')} small>Stĺpce</Btn>
-                  <Btn active={scaleType==='linear'} onClick={() => setScaleType('linear')} small>Lineárna</Btn>
+                  <Btn active={chartType==='bar'}  onClick={() => setChartType('bar')}  small>Stĺpce</Btn>
+                  <Btn active={scaleType==='linear'}      onClick={() => setScaleType('linear')}      small>Lineárna</Btn>
                   <Btn active={scaleType==='logarithmic'} onClick={() => setScaleType('logarithmic')} small>Log</Btn>
                 </div>
               </div>
 
-              {/* Filter vekových skupín */}
               <div style={{ background: '#f9fafb', borderRadius: 8, padding: '10px 14px', marginBottom: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 12, color: '#9ca3af', whiteSpace: 'nowrap' }}>Vekové skupiny:</span>
                   <button onClick={selectAllAges} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px solid #d1d5db', background: selectedAges.size === AGE_ORDER.length ? '#dbeafe' : 'white', color: selectedAges.size === AGE_ORDER.length ? '#1d4ed8' : '#6b7280', cursor: 'pointer' }}>Všetky</button>
-                  <button onClick={() => clearAges('youth')} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px solid #d1d5db', background: 'white', color: '#6b7280', cursor: 'pointer' }}>Mládež</button>
-                  <button onClick={() => clearAges('adult')} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px solid #d1d5db', background: 'white', color: '#6b7280', cursor: 'pointer' }}>Dospelí</button>
-                  <button onClick={() => clearAges('senior')} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px solid #d1d5db', background: 'white', color: '#6b7280', cursor: 'pointer' }}>Seniori</button>
+                  {['youth','adult','senior'].map(g => (
+                    <button key={g} onClick={() => clearAges(g)} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px solid #d1d5db', background: 'white', color: '#6b7280', cursor: 'pointer' }}>
+                      {g === 'youth' ? 'Mládež' : g === 'adult' ? 'Dospelí' : 'Seniori'}
+                    </button>
+                  ))}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                     {AGE_ORDER.map(age => (
-                      <button key={age} onClick={() => toggleAge(age)} style={{
-                        fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px solid',
-                        borderColor: selectedAges.has(age) ? '#388FC3' : '#e5e7eb',
-                        background: selectedAges.has(age) ? '#EBF5FB' : 'white',
-                        color: selectedAges.has(age) ? '#1A2D47' : '#9ca3af',
-                        cursor: 'pointer'
-                      }}>{age}</button>
+                      <button key={age} onClick={() => toggleAge(age)} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px solid', borderColor: selectedAges.has(age) ? '#388FC3' : '#e5e7eb', background: selectedAges.has(age) ? '#EBF5FB' : 'white', color: selectedAges.has(age) ? '#1A2D47' : '#9ca3af', cursor: 'pointer' }}>{age}</button>
                     ))}
                   </div>
                 </div>
               </div>
 
-              {/* Legenda športov */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', marginBottom: 12 }}>
                 {vekData.top20.map((sport, i) => (
-                  <span key={sport} onClick={() => toggleSport(sport)} style={{
-                    display: 'flex', alignItems: 'center', gap: 5,
-                    fontSize: 12, cursor: 'pointer', color: '#555',
-                    opacity: hidden.has(sport) ? 0.35 : 1
-                  }}>
-                    <span style={{ width: 12, height: 3, borderRadius: 2, background: COLORS[i], display: 'inline-block' }} />
-                    {sport}
+                  <span key={sport} onClick={() => toggleSport(sport)} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer', color: '#555', opacity: hidden.has(sport) ? 0.35 : 1 }}>
+                    <span style={{ width: 12, height: 3, borderRadius: 2, background: COLORS[i], display: 'inline-block' }} />{sport}
                   </span>
                 ))}
               </div>
-
-              <div style={{ position: 'relative', height: 380 }}>
-                <canvas ref={vekRef} />
-              </div>
+              <div style={{ position: 'relative', height: 380 }}><canvas ref={vekRef} /></div>
             </section>
 
             {/* ─── SEKCIA 2: Porovnanie vybraných športov ─── */}
@@ -482,68 +340,36 @@ export default function Home() {
                 <p style={{ fontSize: 13, color: '#9ca3af', margin: 0 }}>Výber 1–10 športov · {year}</p>
               </div>
 
-              {/* Activity toggle */}
               <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', alignItems: 'center' }}>
                 <span style={{ fontSize: 13, color: '#6b7280' }}>Kategória:</span>
-                <button onClick={() => setCompareActivity('athlete')} style={{
-                  padding: '5px 14px', borderRadius: 6, border: '1px solid',
-                  borderColor: compareActivity === 'athlete' ? '#1A2D47' : '#e5e7eb',
-                  background: compareActivity === 'athlete' ? '#1A2D47' : 'white',
-                  color: compareActivity === 'athlete' ? 'white' : '#374151',
-                  fontWeight: compareActivity === 'athlete' ? 700 : 400,
-                  cursor: 'pointer', fontSize: 13
-                }}>Športovci</button>
-                <button onClick={() => setCompareActivity('expert')} style={{
-                  padding: '5px 14px', borderRadius: 6, border: '1px solid',
-                  borderColor: compareActivity === 'expert' ? '#1A2D47' : '#e5e7eb',
-                  background: compareActivity === 'expert' ? '#1A2D47' : 'white',
-                  color: compareActivity === 'expert' ? 'white' : '#374151',
-                  fontWeight: compareActivity === 'expert' ? 700 : 400,
-                  cursor: 'pointer', fontSize: 13
-                }}>Odborníci</button>
+                {[['athlete','Športovci'],['expert','Odborníci']].map(([val, label]) => (
+                  <button key={val} onClick={() => setCompareActivity(val)} style={{ padding: '5px 14px', borderRadius: 6, border: '1px solid', borderColor: compareActivity === val ? '#1A2D47' : '#e5e7eb', background: compareActivity === val ? '#1A2D47' : 'white', color: compareActivity === val ? 'white' : '#374151', fontWeight: compareActivity === val ? 700 : 400, cursor: 'pointer', fontSize: 13 }}>{label}</button>
+                ))}
               </div>
 
               {compareLoading ? (
                 <div style={{ textAlign: 'center', padding: '2rem', color: '#9ca3af', fontSize: 14 }}>Načítavam...</div>
               ) : (
                 <>
-                  {/* Sport picker */}
                   <div style={{ marginBottom: '1rem' }}>
-                    <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 8 }}>
-                      Vybrané športy ({compareSports.size}/10) — kliknutím pridáš alebo odoberieš:
-                    </div>
+                    <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 8 }}>Vybrané športy ({compareSports.size}/10) — kliknutím pridáš alebo odoberieš:</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                      {(compareData?.sports || []).map((sport, i) => {
+                      {(compareData?.sports || []).map((sport) => {
                         const isSelected = compareSports.has(sport)
                         const idx = [...compareSports].indexOf(sport)
                         return (
-                          <button key={sport} onClick={() => toggleCompareSport(sport)} style={{
-                            padding: '4px 10px', borderRadius: 20, border: '2px solid',
-                            borderColor: isSelected ? COLORS[idx % COLORS.length] : '#e5e7eb',
-                            background: isSelected ? COLORS[idx % COLORS.length] + '22' : 'white',
-                            color: isSelected ? '#111' : '#6b7280',
-                            cursor: 'pointer', fontSize: 12,
-                            fontWeight: isSelected ? 600 : 400,
-                            opacity: !isSelected && compareSports.size >= 10 ? 0.4 : 1
-                          }}>{sport}</button>
+                          <button key={sport} onClick={() => toggleCompareSport(sport)} style={{ padding: '4px 10px', borderRadius: 20, border: '2px solid', borderColor: isSelected ? COLORS[idx % COLORS.length] : '#e5e7eb', background: isSelected ? COLORS[idx % COLORS.length] + '22' : 'white', color: isSelected ? '#111' : '#6b7280', cursor: 'pointer', fontSize: 12, fontWeight: isSelected ? 600 : 400, opacity: !isSelected && compareSports.size >= 10 ? 0.4 : 1 }}>{sport}</button>
                         )
                       })}
                     </div>
                   </div>
 
-                  {/* Age filter for comparison */}
                   <div style={{ background: 'white', borderRadius: 8, padding: '8px 12px', marginBottom: 14, border: '1px solid #e5e7eb' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 12, color: '#9ca3af', whiteSpace: 'nowrap' }}>Vek:</span>
                       <button onClick={() => setCompareSelectedAges(new Set(AGE_ORDER))} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px solid #d1d5db', background: compareSelectedAges.size === AGE_ORDER.length ? '#dbeafe' : 'white', color: compareSelectedAges.size === AGE_ORDER.length ? '#1d4ed8' : '#6b7280', cursor: 'pointer' }}>Všetky</button>
                       {AGE_ORDER.map(age => (
-                        <button key={age} onClick={() => toggleCompareAge(age)} style={{
-                          fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px solid',
-                          borderColor: compareSelectedAges.has(age) ? '#388FC3' : '#e5e7eb',
-                          background: compareSelectedAges.has(age) ? '#EBF5FB' : 'white',
-                          color: compareSelectedAges.has(age) ? '#1A2D47' : '#9ca3af',
-                          cursor: 'pointer'
-                        }}>{age}</button>
+                        <button key={age} onClick={() => toggleCompareAge(age)} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px solid', borderColor: compareSelectedAges.has(age) ? '#388FC3' : '#e5e7eb', background: compareSelectedAges.has(age) ? '#EBF5FB' : 'white', color: compareSelectedAges.has(age) ? '#1A2D47' : '#9ca3af', cursor: 'pointer' }}>{age}</button>
                       ))}
                     </div>
                   </div>
@@ -559,27 +385,21 @@ export default function Home() {
             <section style={{ marginBottom: '3rem' }}>
               <h2 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 2px', color: '#111' }}>Top 30 zväzov podľa počtu športovcov</h2>
               <p style={{ fontSize: 13, color: '#9ca3af', margin: '0 0 1rem' }}>Aktívni športovci registrovaní v zväze · {year}</p>
-              <div style={{ position: 'relative', height: zvazData.data.length * 28 + 60 }}>
-                <canvas ref={zvazRef} />
-              </div>
+              <div style={{ position: 'relative', height: zvazData.data.length * 28 + 60 }}><canvas ref={zvazRef} /></div>
             </section>
 
             {/* ─── SEKCIA 4: Amatér vs Profi ─── */}
             <section style={{ marginBottom: '3rem' }}>
               <h2 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 2px', color: '#111' }}>Amatéri vs. profesionáli – top 20 športov</h2>
               <p style={{ fontSize: 13, color: '#9ca3af', margin: '0 0 1rem' }}>Rozdelenie podľa statusu športovca · {year}</p>
-              <div style={{ position: 'relative', height: 380 }}>
-                <canvas ref={amRef} />
-              </div>
+              <div style={{ position: 'relative', height: 380 }}><canvas ref={amRef} /></div>
             </section>
 
             {/* ─── SEKCIA 5: Odborníci ─── */}
             <section style={{ marginBottom: '3rem' }}>
               <h2 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 2px', color: '#111' }}>Športoví odborníci – top 25 kategórií</h2>
               <p style={{ fontSize: 13, color: '#9ca3af', margin: '0 0 1rem' }}>Počet odborníkov podľa kategórie a športu · {year}</p>
-              <div style={{ position: 'relative', height: 800 }}>
-                <canvas ref={odborRef} />
-              </div>
+              <div style={{ position: 'relative', height: 800 }}><canvas ref={odborRef} /></div>
             </section>
           </>
         )}
@@ -588,23 +408,12 @@ export default function Home() {
         <section style={{ marginBottom: '3rem' }}>
           <h2 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 2px', color: '#111' }}>Vývoj top 10 športov 2021–2026</h2>
           <p style={{ fontSize: 13, color: '#9ca3af', margin: '0 0 1.5rem' }}>Počet registrovaných osôb po rokoch</p>
-
           {rokyLoading ? (
             <div style={{ textAlign: 'center', padding: '2rem', color: '#9ca3af', fontSize: 14 }}>Načítavam ročné dáta...</div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-              <div>
-                <p style={{ fontSize: 13, fontWeight: 600, color: '#374151', margin: '0 0 8px' }}>Športovci</p>
-                <div style={{ position: 'relative', height: 320 }}>
-                  <canvas ref={rokyAthleteRef} />
-                </div>
-              </div>
-              <div>
-                <p style={{ fontSize: 13, fontWeight: 600, color: '#374151', margin: '0 0 8px' }}>Športoví odborníci</p>
-                <div style={{ position: 'relative', height: 320 }}>
-                  <canvas ref={rokyExpertRef} />
-                </div>
-              </div>
+              <div><p style={{ fontSize: 13, fontWeight: 600, color: '#374151', margin: '0 0 8px' }}>Športovci</p><div style={{ position: 'relative', height: 320 }}><canvas ref={rokyAthleteRef} /></div></div>
+              <div><p style={{ fontSize: 13, fontWeight: 600, color: '#374151', margin: '0 0 8px' }}>Športoví odborníci</p><div style={{ position: 'relative', height: 320 }}><canvas ref={rokyExpertRef} /></div></div>
             </div>
           )}
         </section>
