@@ -1,5 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
 import Head from 'next/head'
+import Link from 'next/link'
+
+const Logo = () => (
+  <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
+    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="40" height="40" rx="8" fill="#1A2D47"/>
+      <rect x="7" y="25" width="5" height="8" rx="1.5" fill="#388FC3"/>
+      <rect x="14" y="19" width="5" height="14" rx="1.5" fill="white"/>
+      <rect x="21" y="22" width="5" height="11" rx="1.5" fill="#388FC3"/>
+      <rect x="28" y="14" width="5" height="19" rx="1.5" fill="white"/>
+    </svg>
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 20, fontWeight: 700, color: '#1A2D47', letterSpacing: '-0.02em', fontFamily: "'Poppins', system-ui, sans-serif", lineHeight: 1 }}>IS Športu</span>
+        <span style={{ fontSize: 11, background: '#1A2D47', color: 'white', padding: '2px 9px', borderRadius: 20, fontWeight: 500, letterSpacing: '0.03em', lineHeight: '18px' }}>štatistiky</span>
+      </div>
+      <p style={{ fontSize: 12, color: '#9ca3af', margin: '2px 0 0', fontFamily: 'system-ui, sans-serif' }}>Informačný systém športu Slovenska</p>
+    </div>
+  </Link>
+)
 
 const AGE_ORDER = ['do 5','6-10','11-14','15-18','19-23','24-30','31-40','41-50','51-60','61+']
 const YEARS = [2021,2022,2023,2024,2025,2026]
@@ -15,17 +35,17 @@ const Btn = ({ active, onClick, children, small }) => (
   <button onClick={onClick} style={{
     padding: small ? '3px 8px' : '4px 10px',
     borderRadius: 6, border: '1px solid',
-    borderColor: active ? '#3b82f6' : '#e5e7eb',
-    background: active ? '#eff6ff' : 'white',
-    color: active ? '#2563eb' : '#374151',
+    borderColor: active ? '#388FC3' : '#e5e7eb',
+    background: active ? '#EBF5FB' : 'white',
+    color: active ? '#1A2D47' : '#374151',
     cursor: 'pointer', fontSize: small ? 11 : 12,
-    fontWeight: active ? 600 : 400
+    fontWeight: active ? 700 : 400
   }}>{children}</button>
 )
 
 export default function Home() {
   const [year, setYear] = useState('2026')
-  const [scaleType, setScaleType] = useState('logarithmic')
+  const [scaleType, setScaleType] = useState('linear')
   const [chartType, setChartType] = useState('line')
   const [hidden, setHidden] = useState(new Set())
   const [selectedAges, setSelectedAges] = useState(new Set(AGE_ORDER))
@@ -37,13 +57,22 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [rokyLoading, setRokyLoading] = useState(true)
 
+  // Comparison chart state
+  const [compareActivity, setCompareActivity] = useState('athlete')
+  const [compareData, setCompareData] = useState(null)
+  const [compareLoading, setCompareLoading] = useState(true)
+  const [compareSports, setCompareSports] = useState(new Set())
+  const [compareSelectedAges, setCompareSelectedAges] = useState(new Set(AGE_ORDER))
+
   const vekRef = useRef(null)
   const zvazRef = useRef(null)
   const amRef = useRef(null)
   const odborRef = useRef(null)
   const rokyAthleteRef = useRef(null)
   const rokyExpertRef = useRef(null)
+  const compareRef = useRef(null)
 
+  // Fetch main year data
   useEffect(() => {
     setLoading(true)
     Promise.all([
@@ -61,6 +90,7 @@ export default function Home() {
     })
   }, [year])
 
+  // Fetch roky data once
   useEffect(() => {
     setRokyLoading(true)
     fetch('/api/roky-sport').then(r => r.json()).then(d => {
@@ -68,6 +98,21 @@ export default function Home() {
       setRokyLoading(false)
     })
   }, [])
+
+  // Fetch comparison data when year or activity changes
+  useEffect(() => {
+    setCompareLoading(true)
+    setCompareSports(new Set())
+    fetch(`/api/vek-porovnanie?year=${year}&activity=${compareActivity}`)
+      .then(r => r.json())
+      .then(d => {
+        setCompareData(d)
+        // Auto-select top 5 sports
+        const top5 = (d.sports || []).slice(0, 5)
+        setCompareSports(new Set(top5))
+        setCompareLoading(false)
+      })
+  }, [year, compareActivity])
 
   const toggleAge = (age) => {
     setSelectedAges(prev => {
@@ -84,7 +129,28 @@ export default function Home() {
     if (group === 'senior') setSelectedAges(new Set(['41-50','51-60','61+']))
   }
 
-  // Chart 1: Vek × Šport (s age filtrom)
+  const toggleCompareSport = (sport) => {
+    setCompareSports(prev => {
+      const next = new Set(prev)
+      if (next.has(sport)) {
+        if (next.size > 1) next.delete(sport)
+      } else {
+        if (next.size < 10) next.add(sport)
+      }
+      return next
+    })
+  }
+
+  const toggleCompareAge = (age) => {
+    setCompareSelectedAges(prev => {
+      const next = new Set(prev)
+      if (next.has(age)) { if (next.size > 1) next.delete(age) }
+      else next.add(age)
+      return next
+    })
+  }
+
+  // Chart 1: Vek × Šport
   useEffect(() => {
     if (!vekData || !window.Chart || !vekRef.current) return
     const existing = window.Chart.getChart(vekRef.current)
@@ -119,7 +185,7 @@ export default function Home() {
         }},
         scales: {
           x: { stacked: chartType === 'bar', ticks: { color: '#888' }, grid: { color: 'rgba(128,128,128,0.1)' } },
-          y: { stacked: chartType === 'bar', type: scaleType, min: scaleType === 'logarithmic' ? 1 : undefined,
+          y: { stacked: chartType === 'bar', type: scaleType, min: scaleType === 'logarithmic' ? 1 : 0,
             ticks: { color: '#888', callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v },
             grid: { color: 'rgba(128,128,128,0.1)' }
           }
@@ -213,7 +279,7 @@ export default function Home() {
   }, [odborData])
 
   // Chart 5 & 6: Vývoj po rokoch
-  const buildRokyChart = (canvasRef, seriesData, title) => {
+  const buildRokyChart = (canvasRef, seriesData) => {
     if (!seriesData || !window.Chart || !canvasRef.current) return
     const existing = window.Chart.getChart(canvasRef.current)
     if (existing) existing.destroy()
@@ -247,6 +313,54 @@ export default function Home() {
   useEffect(() => { buildRokyChart(rokyAthleteRef, rokyData?.athleteData) }, [rokyData])
   useEffect(() => { buildRokyChart(rokyExpertRef, rokyData?.expertData) }, [rokyData])
 
+  // Chart 7: Porovnanie športov
+  useEffect(() => {
+    if (!compareData || !window.Chart || !compareRef.current || compareSports.size === 0) return
+    const existing = window.Chart.getChart(compareRef.current)
+    if (existing) existing.destroy()
+
+    const activeAges = AGE_ORDER.filter(a => compareSelectedAges.has(a))
+    const selectedList = [...compareSports]
+
+    const datasets = selectedList.map((sport, i) => {
+      const pts = activeAges.map(age => {
+        const row = compareData.data.find(d => d._id.sport === sport && d._id.vek === age)
+        return row ? row.count : 0
+      })
+      return {
+        label: sport, data: pts,
+        borderColor: COLORS[i % COLORS.length],
+        backgroundColor: COLORS[i % COLORS.length] + '22',
+        borderWidth: 2.5, pointRadius: 4, pointHoverRadius: 7,
+        tension: 0.35, fill: false,
+      }
+    })
+
+    new window.Chart(compareRef.current, {
+      type: 'line',
+      data: { labels: activeAges, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'bottom', labels: { font: { size: 12 }, color: '#555', boxWidth: 14, padding: 12 } },
+          tooltip: {
+            itemSort: (a,b) => b.raw - a.raw,
+            callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y.toLocaleString('sk-SK')}` }
+          }
+        },
+        scales: {
+          x: { ticks: { color: '#888' }, grid: { color: 'rgba(128,128,128,0.1)' } },
+          y: {
+            min: 0,
+            ticks: { color: '#888', callback: v => v >= 1000 ? (v/1000).toFixed(1)+'k' : v },
+            grid: { color: 'rgba(128,128,128,0.1)' }
+          }
+        }
+      }
+    })
+  }, [compareData, compareSports, compareSelectedAges])
+
   const toggleSport = (sport) => {
     setHidden(prev => { const next = new Set(prev); if (next.has(sport)) next.delete(sport); else next.add(sport); return next })
   }
@@ -260,6 +374,9 @@ export default function Home() {
         <meta name="description" content="Interaktívne štatistiky z Informačného systému športu Slovenska" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&display=swap" rel="stylesheet" />
         <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js" async />
       </Head>
 
@@ -267,22 +384,16 @@ export default function Home() {
 
         {/* Header */}
         <header style={{ borderBottom: '1px solid #e5e7eb', paddingBottom: '1rem', marginBottom: '2rem', paddingTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 22, fontWeight: 600, color: '#111' }}>IS Športu</span>
-              <span style={{ fontSize: 13, background: '#f3f4f6', color: '#6b7280', padding: '2px 10px', borderRadius: 20 }}>štatistiky</span>
-            </div>
-            <p style={{ fontSize: 13, color: '#9ca3af', margin: '2px 0 0' }}>Dáta z Informačného systému športu Slovenska</p>
-          </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <Logo />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <span style={{ fontSize: 13, color: '#6b7280' }}>Rok:</span>
             {['2021','2022','2023','2024','2025','2026'].map(y => (
               <button key={y} onClick={() => setYear(y)} style={{
                 padding: '4px 12px', borderRadius: 6, border: '1px solid',
-                borderColor: year === y ? '#3b82f6' : '#e5e7eb',
-                background: year === y ? '#eff6ff' : 'white',
-                color: year === y ? '#2563eb' : '#374151',
-                fontWeight: year === y ? 600 : 400,
+                borderColor: year === y ? '#388FC3' : '#e5e7eb',
+                background: year === y ? '#EBF5FB' : 'white',
+                color: year === y ? '#1A2D47' : '#374151',
+                fontWeight: year === y ? 700 : 400,
                 cursor: 'pointer', fontSize: 13
               }}>{y}</button>
             ))}
@@ -308,12 +419,12 @@ export default function Home() {
               ))}
             </div>
 
-            {/* Section 1: Vek × Šport */}
+            {/* ─── SEKCIA 1: Vekový profil top 20 športov ─── */}
             <section style={{ marginBottom: '3rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8, marginBottom: '0.75rem' }}>
                 <div>
                   <h2 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 2px', color: '#111' }}>Vekový profil top 20 športov</h2>
-                  <p style={{ fontSize: 13, color: '#9ca3af', margin: 0 }}>Počet športovcov podľa vekovej skupiny</p>
+                  <p style={{ fontSize: 13, color: '#9ca3af', margin: 0 }}>Počet športovcov podľa vekovej skupiny · {year}</p>
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <Btn active={chartType==='line'} onClick={() => setChartType('line')} small>Čiary</Btn>
@@ -335,9 +446,9 @@ export default function Home() {
                     {AGE_ORDER.map(age => (
                       <button key={age} onClick={() => toggleAge(age)} style={{
                         fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px solid',
-                        borderColor: selectedAges.has(age) ? '#3b82f6' : '#e5e7eb',
-                        background: selectedAges.has(age) ? '#eff6ff' : 'white',
-                        color: selectedAges.has(age) ? '#2563eb' : '#9ca3af',
+                        borderColor: selectedAges.has(age) ? '#388FC3' : '#e5e7eb',
+                        background: selectedAges.has(age) ? '#EBF5FB' : 'white',
+                        color: selectedAges.has(age) ? '#1A2D47' : '#9ca3af',
                         cursor: 'pointer'
                       }}>{age}</button>
                     ))}
@@ -364,28 +475,108 @@ export default function Home() {
               </div>
             </section>
 
-            {/* Section 2: Zväzy */}
+            {/* ─── SEKCIA 2: Porovnanie vybraných športov ─── */}
+            <section style={{ marginBottom: '3rem', background: '#f9fafb', borderRadius: 12, padding: '1.5rem' }}>
+              <div style={{ marginBottom: '1rem' }}>
+                <h2 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 2px', color: '#111' }}>Porovnanie športov podľa vekovej štruktúry</h2>
+                <p style={{ fontSize: 13, color: '#9ca3af', margin: 0 }}>Výber 1–10 športov · {year}</p>
+              </div>
+
+              {/* Activity toggle */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: '#6b7280' }}>Kategória:</span>
+                <button onClick={() => setCompareActivity('athlete')} style={{
+                  padding: '5px 14px', borderRadius: 6, border: '1px solid',
+                  borderColor: compareActivity === 'athlete' ? '#1A2D47' : '#e5e7eb',
+                  background: compareActivity === 'athlete' ? '#1A2D47' : 'white',
+                  color: compareActivity === 'athlete' ? 'white' : '#374151',
+                  fontWeight: compareActivity === 'athlete' ? 700 : 400,
+                  cursor: 'pointer', fontSize: 13
+                }}>Športovci</button>
+                <button onClick={() => setCompareActivity('expert')} style={{
+                  padding: '5px 14px', borderRadius: 6, border: '1px solid',
+                  borderColor: compareActivity === 'expert' ? '#1A2D47' : '#e5e7eb',
+                  background: compareActivity === 'expert' ? '#1A2D47' : 'white',
+                  color: compareActivity === 'expert' ? 'white' : '#374151',
+                  fontWeight: compareActivity === 'expert' ? 700 : 400,
+                  cursor: 'pointer', fontSize: 13
+                }}>Odborníci</button>
+              </div>
+
+              {compareLoading ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#9ca3af', fontSize: 14 }}>Načítavam...</div>
+              ) : (
+                <>
+                  {/* Sport picker */}
+                  <div style={{ marginBottom: '1rem' }}>
+                    <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 8 }}>
+                      Vybrané športy ({compareSports.size}/10) — kliknutím pridáš alebo odoberieš:
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                      {(compareData?.sports || []).map((sport, i) => {
+                        const isSelected = compareSports.has(sport)
+                        const idx = [...compareSports].indexOf(sport)
+                        return (
+                          <button key={sport} onClick={() => toggleCompareSport(sport)} style={{
+                            padding: '4px 10px', borderRadius: 20, border: '2px solid',
+                            borderColor: isSelected ? COLORS[idx % COLORS.length] : '#e5e7eb',
+                            background: isSelected ? COLORS[idx % COLORS.length] + '22' : 'white',
+                            color: isSelected ? '#111' : '#6b7280',
+                            cursor: 'pointer', fontSize: 12,
+                            fontWeight: isSelected ? 600 : 400,
+                            opacity: !isSelected && compareSports.size >= 10 ? 0.4 : 1
+                          }}>{sport}</button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Age filter for comparison */}
+                  <div style={{ background: 'white', borderRadius: 8, padding: '8px 12px', marginBottom: 14, border: '1px solid #e5e7eb' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 12, color: '#9ca3af', whiteSpace: 'nowrap' }}>Vek:</span>
+                      <button onClick={() => setCompareSelectedAges(new Set(AGE_ORDER))} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px solid #d1d5db', background: compareSelectedAges.size === AGE_ORDER.length ? '#dbeafe' : 'white', color: compareSelectedAges.size === AGE_ORDER.length ? '#1d4ed8' : '#6b7280', cursor: 'pointer' }}>Všetky</button>
+                      {AGE_ORDER.map(age => (
+                        <button key={age} onClick={() => toggleCompareAge(age)} style={{
+                          fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px solid',
+                          borderColor: compareSelectedAges.has(age) ? '#388FC3' : '#e5e7eb',
+                          background: compareSelectedAges.has(age) ? '#EBF5FB' : 'white',
+                          color: compareSelectedAges.has(age) ? '#1A2D47' : '#9ca3af',
+                          cursor: 'pointer'
+                        }}>{age}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ position: 'relative', height: 360, background: 'white', borderRadius: 8, padding: '1rem', border: '1px solid #e5e7eb' }}>
+                    <canvas ref={compareRef} />
+                  </div>
+                </>
+              )}
+            </section>
+
+            {/* ─── SEKCIA 3: Zväzy ─── */}
             <section style={{ marginBottom: '3rem' }}>
               <h2 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 2px', color: '#111' }}>Top 30 zväzov podľa počtu športovcov</h2>
-              <p style={{ fontSize: 13, color: '#9ca3af', margin: '0 0 1rem' }}>Aktívni športovci registrovaní v zväze</p>
+              <p style={{ fontSize: 13, color: '#9ca3af', margin: '0 0 1rem' }}>Aktívni športovci registrovaní v zväze · {year}</p>
               <div style={{ position: 'relative', height: zvazData.data.length * 28 + 60 }}>
                 <canvas ref={zvazRef} />
               </div>
             </section>
 
-            {/* Section 3: Amatér vs Profi */}
+            {/* ─── SEKCIA 4: Amatér vs Profi ─── */}
             <section style={{ marginBottom: '3rem' }}>
               <h2 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 2px', color: '#111' }}>Amatéri vs. profesionáli – top 20 športov</h2>
-              <p style={{ fontSize: 13, color: '#9ca3af', margin: '0 0 1rem' }}>Rozdelenie podľa statusu športovca</p>
+              <p style={{ fontSize: 13, color: '#9ca3af', margin: '0 0 1rem' }}>Rozdelenie podľa statusu športovca · {year}</p>
               <div style={{ position: 'relative', height: 380 }}>
                 <canvas ref={amRef} />
               </div>
             </section>
 
-            {/* Section 4: Odborníci */}
+            {/* ─── SEKCIA 5: Odborníci ─── */}
             <section style={{ marginBottom: '3rem' }}>
               <h2 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 2px', color: '#111' }}>Športoví odborníci – top 25 kategórií</h2>
-              <p style={{ fontSize: 13, color: '#9ca3af', margin: '0 0 1rem' }}>Počet odborníkov podľa kategórie a športu</p>
+              <p style={{ fontSize: 13, color: '#9ca3af', margin: '0 0 1rem' }}>Počet odborníkov podľa kategórie a športu · {year}</p>
               <div style={{ position: 'relative', height: 800 }}>
                 <canvas ref={odborRef} />
               </div>
@@ -393,7 +584,7 @@ export default function Home() {
           </>
         )}
 
-        {/* Section 5 & 6: Vývoj po rokoch – vždy viditeľné */}
+        {/* ─── SEKCIA 6 & 7: Vývoj po rokoch ─── */}
         <section style={{ marginBottom: '3rem' }}>
           <h2 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 2px', color: '#111' }}>Vývoj top 10 športov 2021–2026</h2>
           <p style={{ fontSize: 13, color: '#9ca3af', margin: '0 0 1.5rem' }}>Počet registrovaných osôb po rokoch</p>
