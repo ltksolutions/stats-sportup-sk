@@ -1,0 +1,4 @@
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #fff; color: #111; }
+button { font-family: inherit; cursor: pointer; transition: all 0.15s; }
+button:hover { opacity: 0.85; }
