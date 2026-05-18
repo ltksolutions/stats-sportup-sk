@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import Head from 'next/head'
 
 const AGE_ORDER = ['do 5','6-10','11-14','15-18','19-23','24-30','31-40','41-50','51-60','61+']
+const YEARS = [2021,2022,2023,2024,2025,2026]
 
 const COLORS = [
   '#378ADD','#1D9E75','#D85A30','#D4537E','#7F77DD',
@@ -10,31 +11,38 @@ const COLORS = [
   '#0C447C','#C0519A','#5DCAA5','#AFA9EC','#854F0B'
 ]
 
-function useChart(canvasRef, buildFn, deps) {
-  const chartRef = useRef(null)
-  useEffect(() => {
-    if (!canvasRef.current || !window.Chart) return
-    if (chartRef.current) chartRef.current.destroy()
-    chartRef.current = buildFn(canvasRef.current)
-    return () => { if (chartRef.current) chartRef.current.destroy() }
-  }, deps)
-}
+const Btn = ({ active, onClick, children, small }) => (
+  <button onClick={onClick} style={{
+    padding: small ? '3px 8px' : '4px 10px',
+    borderRadius: 6, border: '1px solid',
+    borderColor: active ? '#3b82f6' : '#e5e7eb',
+    background: active ? '#eff6ff' : 'white',
+    color: active ? '#2563eb' : '#374151',
+    cursor: 'pointer', fontSize: small ? 11 : 12,
+    fontWeight: active ? 600 : 400
+  }}>{children}</button>
+)
 
 export default function Home() {
   const [year, setYear] = useState('2026')
   const [scaleType, setScaleType] = useState('logarithmic')
   const [chartType, setChartType] = useState('line')
   const [hidden, setHidden] = useState(new Set())
+  const [selectedAges, setSelectedAges] = useState(new Set(AGE_ORDER))
   const [vekData, setVekData] = useState(null)
   const [zvazData, setZvazData] = useState(null)
   const [amProfiData, setAmProfiData] = useState(null)
   const [odborData, setOdborData] = useState(null)
+  const [rokyData, setRokyData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [rokyLoading, setRokyLoading] = useState(true)
 
   const vekRef = useRef(null)
   const zvazRef = useRef(null)
   const amRef = useRef(null)
   const odborRef = useRef(null)
+  const rokyAthleteRef = useRef(null)
+  const rokyExpertRef = useRef(null)
 
   useEffect(() => {
     setLoading(true)
@@ -53,28 +61,47 @@ export default function Home() {
     })
   }, [year])
 
-  // Chart 1: Vek × Šport
+  useEffect(() => {
+    setRokyLoading(true)
+    fetch('/api/roky-sport').then(r => r.json()).then(d => {
+      setRokyData(d)
+      setRokyLoading(false)
+    })
+  }, [])
+
+  const toggleAge = (age) => {
+    setSelectedAges(prev => {
+      const next = new Set(prev)
+      if (next.has(age)) { if (next.size > 1) next.delete(age) }
+      else next.add(age)
+      return next
+    })
+  }
+  const selectAllAges = () => setSelectedAges(new Set(AGE_ORDER))
+  const clearAges = (group) => {
+    if (group === 'youth') setSelectedAges(new Set(['do 5','6-10','11-14','15-18']))
+    if (group === 'adult') setSelectedAges(new Set(['19-23','24-30','31-40']))
+    if (group === 'senior') setSelectedAges(new Set(['41-50','51-60','61+']))
+  }
+
+  // Chart 1: Vek × Šport (s age filtrom)
   useEffect(() => {
     if (!vekData || !window.Chart || !vekRef.current) return
     const existing = window.Chart.getChart(vekRef.current)
     if (existing) existing.destroy()
 
+    const activeAges = AGE_ORDER.filter(a => selectedAges.has(a))
     const { top20, data } = vekData
     const datasets = top20.map((sport, i) => {
-      const pts = AGE_ORDER.map(age => {
+      const pts = activeAges.map(age => {
         const row = data.find(d => d._id.sport === sport && d._id.vek === age)
         return row ? row.count : 0
       })
       return {
-        label: sport,
-        data: pts,
-        borderColor: COLORS[i],
-        backgroundColor: COLORS[i] + '33',
-        borderWidth: 2,
-        pointRadius: chartType === 'line' ? 3 : 0,
-        tension: 0.35,
-        fill: false,
-        hidden: hidden.has(sport),
+        label: sport, data: pts,
+        borderColor: COLORS[i], backgroundColor: COLORS[i] + '33',
+        borderWidth: 2, pointRadius: chartType === 'line' ? 3 : 0,
+        tension: 0.35, fill: false, hidden: hidden.has(sport),
         type: chartType === 'bar' ? 'bar' : 'line',
         stack: chartType === 'bar' ? 'stack' : undefined,
       }
@@ -82,7 +109,7 @@ export default function Home() {
 
     new window.Chart(vekRef.current, {
       type: chartType === 'bar' ? 'bar' : 'line',
-      data: { labels: AGE_ORDER, datasets },
+      data: { labels: activeAges, datasets },
       options: {
         responsive: true, maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
@@ -99,7 +126,7 @@ export default function Home() {
         }
       }
     })
-  }, [vekData, scaleType, chartType, hidden])
+  }, [vekData, scaleType, chartType, hidden, selectedAges])
 
   // Chart 2: Zväzy
   useEffect(() => {
@@ -143,12 +170,10 @@ export default function Home() {
       }),
       backgroundColor: (typeColors[typ] || '#888') + 'BB',
       borderColor: typeColors[typ] || '#888',
-      borderWidth: 1,
-      stack: 'stack'
+      borderWidth: 1, stack: 'stack'
     }))
     new window.Chart(amRef.current, {
-      type: 'bar',
-      data: { labels: top20, datasets },
+      type: 'bar', data: { labels: top20, datasets },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { position: 'top', labels: { font: { size: 12 }, color: '#555' } }, tooltip: {
@@ -173,9 +198,7 @@ export default function Home() {
     new window.Chart(odborRef.current, {
       type: 'bar',
       data: { labels, datasets: [{ label: 'Odborníci', data: values,
-        backgroundColor: COLORS.map(c => c + 'BB'),
-        borderColor: COLORS,
-        borderWidth: 1 }] },
+        backgroundColor: COLORS.map(c => c + 'BB'), borderColor: COLORS, borderWidth: 1 }] },
       options: {
         indexAxis: 'y', responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false }, tooltip: {
@@ -189,12 +212,43 @@ export default function Home() {
     })
   }, [odborData])
 
-  const toggleSport = (sport) => {
-    setHidden(prev => {
-      const next = new Set(prev)
-      if (next.has(sport)) next.delete(sport); else next.add(sport)
-      return next
+  // Chart 5 & 6: Vývoj po rokoch
+  const buildRokyChart = (canvasRef, seriesData, title) => {
+    if (!seriesData || !window.Chart || !canvasRef.current) return
+    const existing = window.Chart.getChart(canvasRef.current)
+    if (existing) existing.destroy()
+    const datasets = seriesData.map((s, i) => ({
+      label: s.sport, data: s.values,
+      borderColor: COLORS[i], backgroundColor: COLORS[i] + '22',
+      borderWidth: 2, pointRadius: 4, pointHoverRadius: 6,
+      tension: 0.3, fill: false
+    }))
+    new window.Chart(canvasRef.current, {
+      type: 'line',
+      data: { labels: YEARS, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'bottom', labels: { font: { size: 11 }, color: '#555', boxWidth: 12, padding: 10 } },
+          tooltip: {
+            itemSort: (a,b) => b.raw - a.raw,
+            callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y.toLocaleString('sk-SK')}` }
+          }
+        },
+        scales: {
+          x: { ticks: { color: '#888' }, grid: { color: 'rgba(128,128,128,0.1)' } },
+          y: { ticks: { color: '#888', callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v }, grid: { color: 'rgba(128,128,128,0.1)' } }
+        }
+      }
     })
+  }
+
+  useEffect(() => { buildRokyChart(rokyAthleteRef, rokyData?.athleteData) }, [rokyData])
+  useEffect(() => { buildRokyChart(rokyExpertRef, rokyData?.expertData) }, [rokyData])
+
+  const toggleSport = (sport) => {
+    setHidden(prev => { const next = new Set(prev); if (next.has(sport)) next.delete(sport); else next.add(sport); return next })
   }
 
   const totalAthletes = vekData?.data?.reduce((s, d) => s + d.count, 0) || 0
@@ -235,11 +289,7 @@ export default function Home() {
           </div>
         </header>
 
-        {loading && (
-          <div style={{ textAlign: 'center', padding: '4rem', color: '#9ca3af', fontSize: 15 }}>
-            Načítavam dáta z databázy...
-          </div>
-        )}
+        {loading && <div style={{ textAlign: 'center', padding: '4rem', color: '#9ca3af', fontSize: 15 }}>Načítavam dáta...</div>}
 
         {!loading && vekData && (
           <>
@@ -260,38 +310,42 @@ export default function Home() {
 
             {/* Section 1: Vek × Šport */}
             <section style={{ marginBottom: '3rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8, marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8, marginBottom: '0.75rem' }}>
                 <div>
                   <h2 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 2px', color: '#111' }}>Vekový profil top 20 športov</h2>
                   <p style={{ fontSize: 13, color: '#9ca3af', margin: 0 }}>Počet športovcov podľa vekovej skupiny</p>
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {['line','bar'].map(t => (
-                      <button key={t} onClick={() => setChartType(t)} style={{
-                        padding: '4px 10px', borderRadius: 6, border: '1px solid',
-                        borderColor: chartType === t ? '#3b82f6' : '#e5e7eb',
-                        background: chartType === t ? '#eff6ff' : 'white',
-                        color: chartType === t ? '#2563eb' : '#374151',
-                        cursor: 'pointer', fontSize: 12
-                      }}>{t === 'line' ? 'Čiary' : 'Stĺpce'}</button>
-                    ))}
-                  </div>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {[['linear','Lineárna'],['logarithmic','Log']].map(([s, label]) => (
-                      <button key={s} onClick={() => setScaleType(s)} style={{
-                        padding: '4px 10px', borderRadius: 6, border: '1px solid',
-                        borderColor: scaleType === s ? '#3b82f6' : '#e5e7eb',
-                        background: scaleType === s ? '#eff6ff' : 'white',
-                        color: scaleType === s ? '#2563eb' : '#374151',
-                        cursor: 'pointer', fontSize: 12
-                      }}>{label}</button>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <Btn active={chartType==='line'} onClick={() => setChartType('line')} small>Čiary</Btn>
+                  <Btn active={chartType==='bar'} onClick={() => setChartType('bar')} small>Stĺpce</Btn>
+                  <Btn active={scaleType==='linear'} onClick={() => setScaleType('linear')} small>Lineárna</Btn>
+                  <Btn active={scaleType==='logarithmic'} onClick={() => setScaleType('logarithmic')} small>Log</Btn>
+                </div>
+              </div>
+
+              {/* Filter vekových skupín */}
+              <div style={{ background: '#f9fafb', borderRadius: 8, padding: '10px 14px', marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, color: '#9ca3af', whiteSpace: 'nowrap' }}>Vekové skupiny:</span>
+                  <button onClick={selectAllAges} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px solid #d1d5db', background: selectedAges.size === AGE_ORDER.length ? '#dbeafe' : 'white', color: selectedAges.size === AGE_ORDER.length ? '#1d4ed8' : '#6b7280', cursor: 'pointer' }}>Všetky</button>
+                  <button onClick={() => clearAges('youth')} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px solid #d1d5db', background: 'white', color: '#6b7280', cursor: 'pointer' }}>Mládež</button>
+                  <button onClick={() => clearAges('adult')} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px solid #d1d5db', background: 'white', color: '#6b7280', cursor: 'pointer' }}>Dospelí</button>
+                  <button onClick={() => clearAges('senior')} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px solid #d1d5db', background: 'white', color: '#6b7280', cursor: 'pointer' }}>Seniori</button>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {AGE_ORDER.map(age => (
+                      <button key={age} onClick={() => toggleAge(age)} style={{
+                        fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px solid',
+                        borderColor: selectedAges.has(age) ? '#3b82f6' : '#e5e7eb',
+                        background: selectedAges.has(age) ? '#eff6ff' : 'white',
+                        color: selectedAges.has(age) ? '#2563eb' : '#9ca3af',
+                        cursor: 'pointer'
+                      }}>{age}</button>
                     ))}
                   </div>
                 </div>
               </div>
 
-              {/* Legend */}
+              {/* Legenda športov */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', marginBottom: 12 }}>
                 {vekData.top20.map((sport, i) => (
                   <span key={sport} onClick={() => toggleSport(sport)} style={{
@@ -338,6 +392,31 @@ export default function Home() {
             </section>
           </>
         )}
+
+        {/* Section 5 & 6: Vývoj po rokoch – vždy viditeľné */}
+        <section style={{ marginBottom: '3rem' }}>
+          <h2 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 2px', color: '#111' }}>Vývoj top 10 športov 2021–2026</h2>
+          <p style={{ fontSize: 13, color: '#9ca3af', margin: '0 0 1.5rem' }}>Počet registrovaných osôb po rokoch</p>
+
+          {rokyLoading ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#9ca3af', fontSize: 14 }}>Načítavam ročné dáta...</div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#374151', margin: '0 0 8px' }}>Športovci</p>
+                <div style={{ position: 'relative', height: 320 }}>
+                  <canvas ref={rokyAthleteRef} />
+                </div>
+              </div>
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#374151', margin: '0 0 8px' }}>Športoví odborníci</p>
+                <div style={{ position: 'relative', height: 320 }}>
+                  <canvas ref={rokyExpertRef} />
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
 
         <footer style={{ borderTop: '1px solid #e5e7eb', paddingTop: '1rem', fontSize: 12, color: '#9ca3af', textAlign: 'center' }}>
           Dáta: Informačný systém športu SR · stats.sportup.sk
