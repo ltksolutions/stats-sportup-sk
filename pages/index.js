@@ -272,6 +272,7 @@ export default function Home() {
           </div>
         </header>
 
+        <div style={{ background: "#FFF8E1", border: "1px solid #F9A825", borderRadius: 8, padding: "8px 16px", marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontSize: 18, lineHeight: 1 }}>⚠️</span><span style={{ fontSize: 13, color: "#7B5E00", fontWeight: 500 }}>Neverifikované, neoficiálne čísla — beta verzia</span></div>
         {loading && <div style={{ textAlign: 'center', padding: '4rem', color: '#9ca3af', fontSize: 15 }}>Načítavam dáta...</div>}
 
         {!loading && vekData && (
