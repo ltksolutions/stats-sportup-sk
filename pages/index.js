@@ -82,7 +82,77 @@ export default function Home() {
 
   // Polluj kým Chart.js nebude dostupný (načítava sa async)
   useEffect(() => {
-    if (window.Chart) { setChartReady(true); return }
+    if (window.Chart) { setChartReady(true);
+
+const SportLoader = ({ size = 'large', text = 'Načítavam dáta...' }) => (
+  <div style={{ textAlign: 'center', padding: size === 'large' ? '4rem 2rem' : '1.5rem 1rem' }}>
+    <style>{`
+      @keyframes sl-bounce {
+        0%, 100% { transform: translateY(0) rotate(0deg); }
+        50% { transform: translateY(-20px) rotate(180deg); }
+      }
+      @keyframes sl-shadow {
+        0%, 100% { transform: scaleX(1); opacity: 0.25; }
+        50% { transform: scaleX(0.45); opacity: 0.08; }
+      }
+      @keyframes sl-dot {
+        0%, 80%, 100% { transform: translateY(0); opacity: 0.3; }
+        40% { transform: translateY(-5px); opacity: 1; }
+      }
+      @keyframes sl-shimmer {
+        0% { background-position: -600px 0; }
+        100% { background-position: 600px 0; }
+      }
+    `}</style>
+    <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
+      <span style={{
+        fontSize: size === 'large' ? 44 : 28,
+        display: 'block',
+        animation: 'sl-bounce 0.9s ease-in-out infinite',
+        lineHeight: 1
+      }}>⚽</span>
+      <div style={{
+        width: size === 'large' ? 28 : 18,
+        height: 5,
+        background: '#1A2D47',
+        borderRadius: '50%',
+        marginTop: 6,
+        animation: 'sl-shadow 0.9s ease-in-out infinite'
+      }} />
+    </div>
+    <div style={{ marginTop: 14, color: '#9ca3af', fontSize: size === 'large' ? 14 : 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+      <span>{text}</span>
+      {[0, 0.18, 0.36].map((d, i) => (
+        <span key={i} style={{
+          display: 'inline-block', width: 4, height: 4, borderRadius: '50%',
+          background: '#388FC3',
+          animation: `sl-dot 1.1s ease-in-out ${d}s infinite`
+        }} />
+      ))}
+    </div>
+  </div>
+)
+
+const SkeletonGrid = () => (
+  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: '2.5rem' }}>
+    {[...Array(6)].map((_, i) => (
+      <div key={i} style={{ background: 'white', borderRadius: 12, padding: '1.2rem', border: '1px solid #f3f4f6' }}>
+        <div style={{
+          height: 11, width: '55%', borderRadius: 6, marginBottom: 10,
+          background: 'linear-gradient(90deg,#e5e7eb 25%,#f9fafb 50%,#e5e7eb 75%)',
+          backgroundSize: '600px 100%', animation: `sl-shimmer 1.4s infinite linear ${i * 0.08}s`
+        }} />
+        <div style={{
+          height: 28, width: '75%', borderRadius: 6,
+          background: 'linear-gradient(90deg,#e5e7eb 25%,#f9fafb 50%,#e5e7eb 75%)',
+          backgroundSize: '600px 100%', animation: `sl-shimmer 1.4s infinite linear ${i * 0.08 + 0.1}s`
+        }} />
+      </div>
+    ))}
+  </div>
+)
+
+ return }
     const id = setInterval(() => {
       if (window.Chart) { setChartReady(true); clearInterval(id) }
     }, 50)
@@ -273,7 +343,7 @@ export default function Home() {
         </header>
 
         <div style={{ background: "#FFF8E1", border: "1px solid #F9A825", borderRadius: 8, padding: "8px 16px", marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontSize: 18, lineHeight: 1 }}>⚠️</span><span style={{ fontSize: 13, color: "#7B5E00", fontWeight: 500 }}>Neverifikované, neoficiálne čísla — beta verzia</span></div>
-        {loading && <div style={{ textAlign: 'center', padding: '4rem', color: '#9ca3af', fontSize: 15 }}>Načítavam dáta...</div>}
+        {loading && <><SkeletonGrid /><SportLoader size='large' text='Načítavam dáta' /></>}
 
         {!loading && vekData && (
           <>
@@ -344,7 +414,7 @@ export default function Home() {
                 ))}
               </div>
               {compareLoading ? (
-                <div style={{ textAlign: 'center', padding: '2rem', color: '#9ca3af', fontSize: 14 }}>Načítavam...</div>
+                <SportLoader size='small' text='Načítavam porovnanie' />
               ) : (
                 <>
                   <div style={{ marginBottom: '1rem' }}>
@@ -403,7 +473,7 @@ export default function Home() {
           <h2 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 2px', color: '#111' }}>Vývoj top 10 športov 2021–2026</h2>
           <p style={{ fontSize: 13, color: '#9ca3af', margin: '0 0 1.5rem' }}>Počet registrovaných osôb po rokoch</p>
           {rokyLoading ? (
-            <div style={{ textAlign: 'center', padding: '2rem', color: '#9ca3af', fontSize: 14 }}>Načítavam ročné dáta...</div>
+            <SportLoader size='small' text='Načítavam ročné dáta' />
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
               <div><p style={{ fontSize: 13, fontWeight: 600, color: '#374151', margin: '0 0 8px' }}>Športovci</p><div style={{ position: 'relative', height: 320 }}><canvas ref={rokyAthleteRef} /></div></div>
