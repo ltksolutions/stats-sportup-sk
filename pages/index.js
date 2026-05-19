@@ -266,15 +266,20 @@ export default function Home() {
 
   // Chart 7: Porovnanie športov
   useEffect(() => {
-    if (!chartReady || !compareData || !compareRef.current || compareSports.size === 0) return
-    const existing = window.Chart.getChart(compareRef.current); if (existing) existing.destroy()
-    const activeAges = AGE_ORDER.filter(a => compareSelectedAges.has(a))
-    const selectedList = [...compareSports]
-    new window.Chart(compareRef.current, {
-      type: 'line',
-      data: { labels: activeAges, datasets: selectedList.map((sport, i) => ({ label: sport, data: activeAges.map(age => { const r = compareData.data.find(d => d._id.sport === sport && d._id.vek === age); return r ? r.count : 0 }), borderColor: COLORS[i % COLORS.length], backgroundColor: COLORS[i % COLORS.length] + '22', borderWidth: 2.5, pointRadius: 4, pointHoverRadius: 7, tension: 0.35, fill: false })) },
-      options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, color: '#555', boxWidth: 14, padding: 12 } }, tooltip: { itemSort: (a,b) => b.raw - a.raw, callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y.toLocaleString('sk-SK')}` } } }, scales: { x: { ticks: { color: '#888' }, grid: { color: 'rgba(128,128,128,0.1)' } }, y: { min: 0, ticks: { color: '#888', callback: v => v >= 1000 ? (v/1000).toFixed(1)+'k' : v }, grid: { color: 'rgba(128,128,128,0.1)' } } } }
+    if (!chartReady || !compareData || compareSports.size === 0) return
+    // rAF zaručí, že canvas má správne rozmery po každom layout-e
+    const raf = requestAnimationFrame(() => {
+      if (!compareRef.current) return
+      const existing = window.Chart.getChart(compareRef.current); if (existing) existing.destroy()
+      const activeAges = AGE_ORDER.filter(a => compareSelectedAges.has(a))
+      const selectedList = [...compareSports]
+      new window.Chart(compareRef.current, {
+        type: 'line',
+        data: { labels: activeAges, datasets: selectedList.map((sport, i) => ({ label: sport, data: activeAges.map(age => { const r = compareData.data.find(d => d._id.sport === sport && d._id.vek === age); return r ? r.count : 0 }), borderColor: COLORS[i % COLORS.length], backgroundColor: COLORS[i % COLORS.length] + '22', borderWidth: 2.5, pointRadius: 4, pointHoverRadius: 7, tension: 0.35, fill: false })) },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, color: '#555', boxWidth: 14, padding: 12 } }, tooltip: { itemSort: (a,b) => b.raw - a.raw, callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y.toLocaleString('sk-SK')}` } } }, scales: { x: { ticks: { color: '#888' }, grid: { color: 'rgba(128,128,128,0.1)' } }, y: { min: 0, ticks: { color: '#888', callback: v => v >= 1000 ? (v/1000).toFixed(1)+'k' : v }, grid: { color: 'rgba(128,128,128,0.1)' } } } }
+      })
     })
+    return () => cancelAnimationFrame(raf)
   }, [chartReady, compareData, compareSports, compareSelectedAges, compareLoading])
 
   const totalAthletes = vekData?.data?.reduce((s, d) => s + d.count, 0) || 0
@@ -425,6 +430,33 @@ export default function Home() {
               <div style={{ position: 'relative', height: 360, background: 'white', borderRadius: 8, padding: '1rem', border: '1px solid #e5e7eb' }}>
                 <canvas ref={compareRef} />
               </div>
+              {/* Súčty po vybraných športoch */}
+              {!compareLoading && compareData && compareSports.size > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 8 }}>Celkový počet (vybrané vekové skupiny)</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {[...compareSports]
+                      .map((sport, i) => {
+                        const activeAges = AGE_ORDER.filter(a => compareSelectedAges.has(a))
+                        const total = activeAges.reduce((sum, age) => {
+                          const r = compareData.data.find(d => d._id.sport === sport && d._id.vek === age)
+                          return sum + (r ? r.count : 0)
+                        }, 0)
+                        return { sport, total, color: COLORS[i % COLORS.length] }
+                      })
+                      .sort((a, b) => b.total - a.total)
+                      .map(({ sport, total, color }) => (
+                        <div key={sport} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'white', border: '1px solid #e5e7eb', borderLeft: `4px solid ${color}`, borderRadius: 8, padding: '8px 14px', minWidth: 160 }}>
+                          <div>
+                            <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 2 }}>{sport}</div>
+                            <div style={{ fontSize: 18, fontWeight: 700, color: '#111' }}>{total.toLocaleString('sk-SK')}</div>
+                          </div>
+                        </div>
+                      ))
+                    }
+                  </div>
+                </div>
+              )}
             </div>
             </section>
 
