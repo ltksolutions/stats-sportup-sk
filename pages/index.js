@@ -275,7 +275,7 @@ export default function Home() {
       data: { labels: activeAges, datasets: selectedList.map((sport, i) => ({ label: sport, data: activeAges.map(age => { const r = compareData.data.find(d => d._id.sport === sport && d._id.vek === age); return r ? r.count : 0 }), borderColor: COLORS[i % COLORS.length], backgroundColor: COLORS[i % COLORS.length] + '22', borderWidth: 2.5, pointRadius: 4, pointHoverRadius: 7, tension: 0.35, fill: false })) },
       options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, color: '#555', boxWidth: 14, padding: 12 } }, tooltip: { itemSort: (a,b) => b.raw - a.raw, callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y.toLocaleString('sk-SK')}` } } }, scales: { x: { ticks: { color: '#888' }, grid: { color: 'rgba(128,128,128,0.1)' } }, y: { min: 0, ticks: { color: '#888', callback: v => v >= 1000 ? (v/1000).toFixed(1)+'k' : v }, grid: { color: 'rgba(128,128,128,0.1)' } } } }
     })
-  }, [chartReady, compareData, compareSports, compareSelectedAges])
+  }, [chartReady, compareData, compareSports, compareSelectedAges, compareLoading])
 
   const totalAthletes = vekData?.data?.reduce((s, d) => s + d.count, 0) || 0
 
