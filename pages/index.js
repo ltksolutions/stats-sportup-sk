@@ -388,9 +388,15 @@ export default function Home() {
                   <button key={val} onClick={() => setCompareActivity(val)} style={{ padding: '5px 14px', borderRadius: 6, border: '1px solid', borderColor: compareActivity === val ? '#1A2D47' : '#e5e7eb', background: compareActivity === val ? '#1A2D47' : 'white', color: compareActivity === val ? 'white' : '#374151', fontWeight: compareActivity === val ? 700 : 400, cursor: 'pointer', fontSize: 13 }}>{label}</button>
                 ))}
               </div>
-              {compareLoading ? (
-                <SportLoader size='small' text='Načítavam porovnanie' />
-              ) : (
+              <div style={{ position: 'relative' }}>
+              {/* Loader overlay — canvas zostáva v DOM */}
+              {compareLoading && (
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, zIndex: 10 }}>
+                  <SportLoader size='small' text='Načítavam porovnanie' />
+                </div>
+              )}
+              {/* Ovládacie prvky — zobrazia sa keď dáta sú pripravené */}
+              {!compareLoading && (
                 <>
                   <div style={{ marginBottom: '1rem' }}>
                     <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 8 }}>Vybrané športy ({compareSports.size}/10) — kliknutím pridáš alebo odoberieš:</div>
@@ -415,10 +421,11 @@ export default function Home() {
                   </div>
                 </>
               )}
-              {/* Canvas vždy v DOM — len skrytý počas načítavania */}
-              <div style={{ display: compareLoading ? 'none' : 'block', position: 'relative', height: 360, background: 'white', borderRadius: 8, padding: '1rem', border: '1px solid #e5e7eb', marginTop: 0 }}>
+              {/* Canvas VŽDY v DOM — nikdy display:none, Chart.js má vždy správne rozmery */}
+              <div style={{ position: 'relative', height: 360, background: 'white', borderRadius: 8, padding: '1rem', border: '1px solid #e5e7eb' }}>
                 <canvas ref={compareRef} />
               </div>
+            </div>
             </section>
 
             {/* ─── SEKCIA 3: Zväzy ─── */}
