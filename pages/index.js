@@ -413,11 +413,12 @@ export default function Home() {
                       ))}
                     </div>
                   </div>
-                  <div style={{ position: 'relative', height: 360, background: 'white', borderRadius: 8, padding: '1rem', border: '1px solid #e5e7eb' }}>
-                    <canvas ref={compareRef} />
-                  </div>
                 </>
               )}
+              {/* Canvas vždy v DOM — len skrytý počas načítavania */}
+              <div style={{ display: compareLoading ? 'none' : 'block', position: 'relative', height: 360, background: 'white', borderRadius: 8, padding: '1rem', border: '1px solid #e5e7eb', marginTop: 0 }}>
+                <canvas ref={compareRef} />
+              </div>
             </section>
 
             {/* ─── SEKCIA 3: Zväzy ─── */}
