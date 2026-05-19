@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 
-const OG_TITLE       = 'Štatistiky slovenského športu – IS Športu'
+const OG_TITLE       = 'Štatistiky slovenského športu – SportStats'
 const OG_DESCRIPTION = 'Interaktívny dashboard dát z Informačného systému športu Slovenska. Vekové profily, zväzy, amatéri vs. profesionáli a vývoj 2021–2026.'
 const OG_URL         = 'https://stats.sportup.sk'
 const OG_IMAGE       = 'https://stats.sportup.sk/og-image.png'
@@ -18,10 +18,10 @@ const Logo = () => (
     </svg>
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 20, fontWeight: 700, color: '#1A2D47', letterSpacing: '-0.02em', fontFamily: "'Poppins', system-ui, sans-serif", lineHeight: 1 }}>IS Športu</span>
+        <span style={{ fontSize: 20, fontWeight: 700, color: '#1A2D47', letterSpacing: '-0.02em', fontFamily: "'Poppins', system-ui, sans-serif", lineHeight: 1 }}>SportStats</span>
         <span style={{ fontSize: 11, background: '#1A2D47', color: 'white', padding: '2px 9px', borderRadius: 20, fontWeight: 500, letterSpacing: '0.03em', lineHeight: '18px' }}>štatistiky</span>
       </div>
-      <p style={{ fontSize: 12, color: '#9ca3af', margin: '2px 0 0', fontFamily: 'system-ui, sans-serif' }}>Informačný systém športu Slovenska</p>
+      <p style={{ fontSize: 12, color: '#9ca3af', margin: '2px 0 0', fontFamily: 'system-ui, sans-serif' }}>Good Idead Sport Slovakia</p>
     </div>
   </Link>
 )
