@@ -265,8 +265,10 @@ export default function Home() {
   useEffect(() => { if (chartReady && rokyData?.expertData)  buildRokyChart(rokyExpertRef,  rokyData.expertData)  }, [chartReady, rokyData])
 
   // Chart 7: Porovnanie športov
+  // FIX: pridaný `loading` do deps — keď sa canvas vráti do DOM po loading=false,
+  // graf sa prekreslí aj keď compareData sa medzičasom nezmenilo
   useEffect(() => {
-    if (!chartReady || !compareData || compareSports.size === 0) return
+    if (!chartReady || !compareData || compareSports.size === 0 || loading) return
     // rAF zaručí, že canvas má správne rozmery po každom layout-e
     const raf = requestAnimationFrame(() => {
       if (!compareRef.current) return
@@ -280,7 +282,7 @@ export default function Home() {
       })
     })
     return () => cancelAnimationFrame(raf)
-  }, [chartReady, compareData, compareSports, compareSelectedAges, compareLoading])
+  }, [chartReady, compareData, compareSports, compareSelectedAges, compareLoading, loading])
 
   const totalAthletes = vekData?.data?.reduce((s, d) => s + d.count, 0) || 0
 
